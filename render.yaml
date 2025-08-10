@@ -1,8 +1,9 @@
-staticSites:
-  - name: cardio-frontend
+services:
+  - type: web
+    name: cardio-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
-    publishPath: dist
+    staticpublishPath: dist
     envVars:
       - key: NODE_VERSION
         value: 18
