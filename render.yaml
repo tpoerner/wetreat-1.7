@@ -1,6 +1,7 @@
 services:
+  # ===== FRONTEND (React + Tailwind, served via `serve`) =====
   - type: web
-    name: cardio-frontend-v2
+    name: cardio-frontend-v2           # new name to avoid "changing service type" errors
     rootDir: frontend
     env: node
     plan: free
@@ -9,13 +10,14 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
-      - key: VITE_API_BASE
-        sync: false
-      - key: NPM_CONFIG_PRODUCTION
+      - key: NPM_CONFIG_PRODUCTION      # ensures Tailwind/PostCSS devDeps are installed
         value: "false"
+      - key: VITE_API_BASE              # set this AFTER backend is live (e.g., https://cardio-backend-v2.onrender.com)
+        sync: false
 
+  # ===== BACKEND (Node/Express + SQLite in /tmp) =====
   - type: web
-    name: cardio-backend-v2    # <-- new name
+    name: cardio-backend-v2            # new name to avoid conflicts
     rootDir: backend
     env: node
     plan: free
@@ -25,5 +27,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
-      - key: ADMIN_PASSWORD
+      - key: ADMIN_PASSWORD            # set this in the dashboard after creation
+        sync: false
+      # Optional branding for auto-fill in Consultation updates/PDF
+      - key: ADMIN_NAME
+        sync: false
+      - key: ADMIN_EMAIL
         sync: false
