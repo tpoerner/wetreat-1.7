@@ -1,0 +1,24 @@
+staticSites:
+  - name: cardio-frontend
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_API_BASE
+        sync: false
+
+services:
+  - type: web
+    name: cardio-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: ADMIN_PASSWORD
+        sync: false
