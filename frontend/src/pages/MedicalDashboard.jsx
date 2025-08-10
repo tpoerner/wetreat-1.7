@@ -32,7 +32,8 @@ export default function MedicalDashboard() {
       body: JSON.stringify({
         physicianName: edit.physicianName || adminName,
         physicianEmail: edit.physicianEmail || adminEmail,
-        recommendations: edit.recommendations
+        diagnosis: edit.diagnosis || '',            // << NEW
+        recommendations: edit.recommendations || ''
       })
     });
     if (r.ok) {
@@ -86,7 +87,7 @@ export default function MedicalDashboard() {
       </div>
 
       <div className="card-bd">
-        <div className="overflow-auto max-h-[65vh]">
+        <div className="overflow-auto max-h=[65vh]">
           <table className="table">
             <thead>
               <tr>
@@ -111,6 +112,7 @@ export default function MedicalDashboard() {
                       <div><b>Name:</b> {r.physicianName||'—'}</div>
                       <div><b>Email:</b> {r.physicianEmail||'—'}</div>
                       <div><b>Time:</b> {r.consultationTimestamp? new Date(r.consultationTimestamp).toLocaleString():'—'}</div>
+                      <div><b>Diagnosis:</b> {r.diagnosis||'—'}</div>          {/* << NEW in table */}
                       <div><b>Recs:</b> {r.recommendations||'—'}</div>
                     </div>
                   </td>
@@ -135,10 +137,26 @@ export default function MedicalDashboard() {
             <div className="card-hd"><div className="card-title">Edit Consultation for #{edit.id}</div></div>
             <div className="card-bd">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="text-sm text-slate-700">Physician's Name</label><input className="input" value={edit.physicianName||adminName} onChange={e=>setEdit({...edit, physicianName:e.target.value})} /></div>
-                <div><label className="text-sm text-slate-700">Physician's Email</label><input className="input" type="email" value={edit.physicianEmail||adminEmail} onChange={e=>setEdit({...edit, physicianEmail:e.target.value})} /></div>
-                <div className="md:col-span-2"><label className="text-sm text-slate-700">Recommendations</label><textarea className="textarea" value={edit.recommendations||''} onChange={e=>setEdit({...edit, recommendations:e.target.value})} /></div>
+                <div>
+                  <label className="text-sm text-slate-700">Physician's Name</label>
+                  <input className="input" value={edit.physicianName||adminName} onChange={e=>setEdit({...edit, physicianName:e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-700">Physician's Email</label>
+                  <input className="input" type="email" value={edit.physicianEmail||adminEmail} onChange={e=>setEdit({...edit, physicianEmail:e.target.value})} />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-slate-700">Diagnosis</label>     {/* << NEW field */}
+                  <textarea className="textarea" value={edit.diagnosis||''} onChange={e=>setEdit({...edit, diagnosis:e.target.value})} />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm text-slate-700">Recommendations</label>
+                  <textarea className="textarea" value={edit.recommendations||''} onChange={e=>setEdit({...edit, recommendations:e.target.value})} />
+                </div>
               </div>
+
               <div className="mt-4 flex gap-2">
                 <button className="btn" onClick={saveConsult}>Save</button>
                 <button className="btn-ghost" onClick={()=>setEdit(null)}>Cancel</button>
