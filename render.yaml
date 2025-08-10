@@ -1,4 +1,4 @@
-services:
+staticSite:
   - type: web
     name: cardio-frontend
     rootDir: frontend
@@ -10,6 +10,7 @@ services:
       - key: VITE_API_BASE
         sync: false
 
+services:
   - type: web
     name: cardio-backend
     env: node
