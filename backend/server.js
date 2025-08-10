@@ -1,4 +1,3 @@
-// backend/server.js
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -17,14 +16,16 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 10000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
+const ADMIN_NAME = process.env.ADMIN_NAME || '';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 
 app.use(cors());
 app.use(express.json());
 
-const dbDir = '/tmp';
-const dbPath = path.join(dbDir, 'data.sqlite');
-
+// DB in /tmp for Hobby tier
+const dbPath = '/tmp/wetreat.sqlite';
 let db;
+
 async function initDb() {
   db = await open({ filename: dbPath, driver: sqlite3.Database });
   await db.exec(`
@@ -36,7 +37,7 @@ async function initDb() {
       patientId TEXT,
       symptoms TEXT,
       medicalHistory TEXT,
-      documentsList TEXT,
+      documentsList TEXT,  -- "Desc - URL" per line
       notes TEXT,
       physicianName TEXT,
       physicianEmail TEXT,
@@ -45,141 +46,114 @@ async function initDb() {
       createdAt TEXT
     )
   `);
-  const row = await db.get('SELECT COUNT(*) as c FROM patients');
-  if (row.c === 0) {
+  const c = await db.get('SELECT COUNT(*) as c FROM patients');
+  if (c.c === 0) {
     const now = new Date().toISOString();
     await db.run(`INSERT INTO patients
-      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,
-       physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
+      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
         'John Doe','john.doe@example.com','1963-04-12','JD-6201',
         'Exertional chest pain, dyspnea on exertion.',
         'CAD with prior PCI (2018). HTN. Dyslipidemia. Smoker (quit 2019).',
-        'Stress echo (positive) - https://example.com/stress-echo\nCoronary CTA - https://example.com/cta\nLipids (June) - https://example.com/labs-lipids',
+        'Stress echo (positive) - https://example.com/stress-echo\nCoronary CTA - https://example.com/cta',
         'Increased chest discomfort last 2 weeks.',
         'Dr. Alex Rivera','alex.rivera@clinic.org', new Date().toISOString(),
-        'Continue DAPT as indicated; optimize statin therapy; schedule functional testing in 3 months.', now
-      ]
-    );
+        'Continue DAPT; optimize statin; schedule functional testing in 3 months.',
+        now
+      ]);
     await db.run(`INSERT INTO patients
-      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,
-       physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
+      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
         'Jane Smith','jane.smith@example.com','1967-09-03','JS-5812',
         'Fatigue, exertional dyspnea (NYHA II).',
         'Severe mitral regurgitation on echo (2024). T2DM.',
-        'Echo report - https://example.com/echo\nCath report - https://example.com/cath\nHbA1c - https://example.com/hba1c',
+        'Echo report - https://example.com/echo\nCath report - https://example.com/cath',
         'No syncope. Occasional palpitations.',
         'Dr. Maria Chen','maria.chen@heartcenter.org', new Date().toISOString(),
-        'Refer for valve team evaluation; consider surgical repair; manage glycemic control.', now
-      ]
-    );
+        'Refer to valve team; consider repair; optimize glycemic control.',
+        now
+      ]);
   }
 }
 
-function adminOnly(req, res, next) {
+function adminOnly(req,res,next){
   const pass = req.headers['x-admin-password'];
   if (pass && pass === ADMIN_PASSWORD) return next();
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
-app.post('/api/intake', async (req, res) => {
-  try {
-    const { fullName='', email='', dob='', patientId='',
-            symptoms='', medicalHistory='', documentsList='',
-            notes='' } = req.body || {};
+// Intake
+app.post('/api/intake', async (req,res)=>{
+  try{
+    const { fullName='', email='', dob='', patientId='', symptoms='', medicalHistory='', documentsList='', notes='' } = req.body || {};
     const createdAt = new Date().toISOString();
-    await db.run(
-      `INSERT INTO patients
-       (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,
-        physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
-       VALUES (?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,?)`,
-      [fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,createdAt]
-    );
-    res.json({ success: true });
-  } catch (e) {
-    console.error('POST /api/intake error', e);
-    res.status(500).json({ success: false });
-  }
+    await db.run(`INSERT INTO patients
+      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
+      VALUES (?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,?)`,
+      [fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,createdAt]);
+    res.json({ success:true });
+  }catch(e){ console.error(e); res.status(500).json({ success:false }); }
 });
 
-app.get('/api/patients', adminOnly, async (req, res) => {
-  try {
-    const { search = '', sort = 'createdAt', dir = 'DESC' } = req.query;
+// List/search/sort
+app.get('/api/patients', adminOnly, async (req,res)=>{
+  try{
+    const { search='', sort='createdAt', dir='DESC' } = req.query;
     const safeSort = ['id','createdAt','fullName','patientId','dob','email','consultationTimestamp'].includes(sort) ? sort : 'createdAt';
-    const safeDir  = (dir || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const safeDir = (dir||'').toUpperCase()==='ASC' ? 'ASC' : 'DESC';
     const like = `%${search}%`;
-    const rows = await db.all(
-      `SELECT * FROM patients
-       WHERE fullName LIKE ? OR email LIKE ? OR patientId LIKE ? OR symptoms LIKE ? OR medicalHistory LIKE ?
-          OR notes LIKE ? OR documentsList LIKE ? OR physicianName LIKE ? OR physicianEmail LIKE ? OR recommendations LIKE ?
-       ORDER BY ${safeSort} ${safeDir}`,
-      [like,like,like,like,like,like,like,like,like,like]
-    );
+    const rows = await db.all(`SELECT * FROM patients
+      WHERE fullName LIKE ? OR email LIKE ? OR patientId LIKE ? OR symptoms LIKE ? OR medicalHistory LIKE ? OR notes LIKE ? OR documentsList LIKE ? OR physicianName LIKE ? OR physicianEmail LIKE ? OR recommendations LIKE ?
+      ORDER BY ${safeSort} ${safeDir}`, [like,like,like,like,like,like,like,like,like,like]);
     res.json(rows);
-  } catch (e) {
-    console.error('GET /api/patients error', e);
-    res.status(500).json({ success: false });
-  }
+  }catch(e){ console.error(e); res.status(500).json({ success:false }); }
 });
 
-app.put('/api/patients/:id/consultation', adminOnly, async (req, res) => {
-  try {
+// Update consultation (auto timestamp; pull admin name/email from headers or env)
+app.put('/api/patients/:id/consultation', adminOnly, async (req,res)=>{
+  try{
     const { id } = req.params;
-    const { physicianName='', physicianEmail='', recommendations='' } = req.body || {};
+    let { physicianName='', physicianEmail='', recommendations='' } = req.body || {};
+    const headerName = req.headers['x-admin-name'] || ADMIN_NAME;
+    const headerEmail = req.headers['x-admin-email'] || ADMIN_EMAIL;
+    if (!physicianName) physicianName = headerName;
+    if (!physicianEmail) physicianEmail = headerEmail;
     const consultationTimestamp = new Date().toISOString();
-    const r = await db.run(
-      `UPDATE patients
-       SET physicianName=?, physicianEmail=?, consultationTimestamp=?, recommendations=?
-       WHERE id=?`,
-      [physicianName, physicianEmail, consultationTimestamp, recommendations, id]
-    );
-    if (r.changes === 0) return res.status(404).json({ success:false, message:'Not found' });
+    const r = await db.run(`UPDATE patients SET physicianName=?, physicianEmail=?, consultationTimestamp=?, recommendations=? WHERE id=?`,
+      [physicianName, physicianEmail, consultationTimestamp, recommendations, id]);
+    if (r.changes===0) return res.status(404).json({ success:false, message:'Not found' });
     res.json({ success:true, consultationTimestamp });
-  } catch (e) {
-    console.error('PUT /api/patients/:id/consultation error', e);
-    res.status(500).json({ success: false });
-  }
+  }catch(e){ console.error(e); res.status(500).json({ success:false }); }
 });
 
-app.delete('/api/patients/:id', adminOnly, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const r = await db.run('DELETE FROM patients WHERE id=?', [id]);
-    if (r.changes === 0) return res.status(404).json({ success:false, message:'Not found' });
-    res.json({ success: true });
-  } catch (e) {
-    console.error('DELETE /api/patients/:id error', e);
-    res.status(500).json({ success: false });
-  }
+// Delete
+app.delete('/api/patients/:id', adminOnly, async (req,res)=>{
+  try{
+    const r = await db.run('DELETE FROM patients WHERE id=?', [req.params.id]);
+    if (r.changes===0) return res.status(404).json({ success:false, message:'Not found' });
+    res.json({ success:true });
+  }catch(e){ console.error(e); res.status(500).json({ success:false }); }
 });
 
-app.get('/api/patients/:id/report', adminOnly, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const row = await db.get('SELECT * FROM patients WHERE id=?', [id]);
+// PDF (A4, small logo top-right if PNG exists, clickable URLs)
+app.get('/api/patients/:id/report', adminOnly, async (req,res)=>{
+  try{
+    const row = await db.get('SELECT * FROM patients WHERE id=?', [req.params.id]);
     if (!row) return res.status(404).send('Not found');
 
-    const logoPngPath = path.join(__dirname, 'assets', 'logo.png'); // optional PNG
-    const hasLogo = fs.existsSync(logoPngPath);
-
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 50, left: 50, right: 50, bottom: 50 } });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=patient_${id}_report.pdf`);
+    const logoPng = path.join(__dirname, 'assets', 'logo.png'); // optional
+    const doc = new PDFDocument({ size:'A4', margins:{ top:50,left:50,right:50,bottom:50 } });
+    res.setHeader('Content-Type','application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=patient_${row.id}_report.pdf`);
     doc.pipe(res);
 
-    if (hasLogo) {
-      const img = doc.openImage(logoPngPath);
-      const h = 40;
-      const w = img.width * (h / img.height);
-      doc.image(img, 545 - w, 35, { width: w, height: h });
+    if (fs.existsSync(logoPng)) {
+      try { doc.image(logoPng, 500, 35, { fit:[60,40], align:'right' }); } catch {}
     }
     doc.moveTo(50, 90).lineTo(545, 90).stroke();
 
-    const section = (t) => { doc.moveDown(1); doc.fontSize(13).text(t, { underline: true }); doc.moveDown(0.5); doc.fontSize(11); };
-    const field = (k, v) => { doc.font('Helvetica-Bold').text(k + ': ', { continued: true }); doc.font('Helvetica').text(v || '—'); };
+    const section = (t)=>{ doc.moveDown(1); doc.fontSize(13).text(t, { underline:true }); doc.moveDown(0.3); doc.fontSize(11); };
+    const field = (k,v)=>{ doc.font('Helvetica-Bold').text(k+': ', {continued:true}); doc.font('Helvetica').text(v||'—'); };
 
     section('Patient Demographics');
     field('Full Name', row.fullName);
@@ -191,27 +165,24 @@ app.get('/api/patients/:id/report', adminOnly, async (req, res) => {
     section('Clinical Information');
     field('Symptoms', row.symptoms);
     field('Medical History', row.medicalHistory);
-
-    doc.font('Helvetica-Bold').text('Medical Documents & Imaging (Description + URL):');
-    const lines = (row.documentsList || '').split('\n').map(s=>s.trim()).filter(Boolean);
-    if (lines.length) {
+    doc.font('Helvetica-Bold').text('Medical Documents & Imaging:');
+    const lines = (row.documentsList||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    if (lines.length){
       doc.font('Helvetica');
-      lines.forEach(line => {
-        const parts = line.split(' - ');
-        const desc = parts[0] || '';
-        const url = parts[1] || '';
+      lines.forEach(line=>{
+        const [desc,url] = line.split(' - ');
+        const d = desc || 'Document';
         if (url) {
-          doc.text('• ' + (desc ? desc + ': ' : ''), { continued: true });
-          doc.fillColor('blue').text(url, { link: url, underline: true });
+          doc.text('• '+d+': ', {continued:true});
+          doc.fillColor('blue').text(url, { link:url, underline:true });
           doc.fillColor('black');
         } else {
-          doc.text('• ' + line);
+          doc.text('• '+(desc||line));
         }
       });
     } else {
       doc.font('Helvetica').text('—');
     }
-
     field('Notes', row.notes);
 
     section('Consultation');
@@ -221,13 +192,10 @@ app.get('/api/patients/:id/report', adminOnly, async (req, res) => {
     field('Recommendations', row.recommendations);
 
     doc.end();
-  } catch (e) {
-    console.error('GET /api/patients/:id/report error', e);
-    res.status(500).send('Failed to generate report');
-  }
+  }catch(e){ console.error(e); res.status(500).send('Failed to generate report'); }
 });
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, dbPath }));
+app.get('/api/health', (_req,res)=>res.json({ ok:true, dbPath }));
 
-initDb().then(() => app.listen(PORT, () => console.log(`✅ Backend on ${PORT}; DB at ${dbPath}`)))
-       .catch(err => { console.error('DB init failed:', err); process.exit(1); });
+initDb().then(()=> app.listen(PORT, ()=>console.log(`✅ Backend on ${PORT}; DB at ${dbPath}`)))
+       .catch(err=>{ console.error('DB init failed:', err); process.exit(1); });
