@@ -1,29 +1,2 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-/* EMR look helpers */
-.container { @apply max-w-7xl mx-auto px-4; }
-.card { @apply bg-white rounded-xl shadow-md; }
-.card-hd { @apply px-6 py-4 border-b flex items-center justify-between; }
-.card-title { @apply text-lg font-semibold text-slate-800; }
-.card-bd { @apply p-6; }
-
-.input { @apply w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600; }
-.textarea { @apply w-full rounded-md border border-slate-300 px-3 py-2 min-h-[110px] resize-vertical focus:outline-none focus:ring-2 focus:ring-blue-600; }
-.select { @apply rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600; }
-
-.btn { @apply inline-flex items-center gap-2 rounded-md px-4 py-2 font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60; }
-.btn-ghost { @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5 bg-transparent text-blue-800 hover:bg-blue-100; }
-.btn-danger { @apply inline-flex items-center gap-2 rounded-md px-4 py-2 font-medium text-white bg-red-600 hover:bg-red-700; }
-
-.table { @apply min-w-full border-separate border-spacing-0; }
-.th { @apply sticky top-0 bg-slate-200 text-slate-700 text-xs font-semibold uppercase tracking-wide text-left px-3 py-2 border-b; }
-.td { @apply align-top text-sm text-slate-800 px-3 py-3 border-b; }
-.tr:hover { @apply bg-slate-50; }
-
-.badge { @apply inline-block rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700; }
-.link { @apply text-blue-700 underline hover:text-blue-900 break-all; }
-.nav { @apply bg-blue-900 text-white; }
-.nav-btn { @apply px-3 py-2 rounded-md hover:bg-blue-800; }
 
