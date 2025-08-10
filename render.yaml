@@ -3,7 +3,7 @@ services:
     name: cardio-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
-    staticpublishPath: dist
+    publishPath: dist
     envVars:
       - key: NODE_VERSION
         value: 18
