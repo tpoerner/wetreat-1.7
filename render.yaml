@@ -1,6 +1,22 @@
 services:
+  # ---------- FRONTEND ----------
+  - type: web
+    name: cardio-frontend
+    rootDir: frontend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npx serve -s dist -l $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_API_BASE
+        sync: false   # set this to the backend URL after the backend deploys
+
+  # ---------- BACKEND ----------
   - type: web
     name: cardio-backend
+    rootDir: backend
     env: node
     plan: free
     buildCommand: npm install
@@ -11,16 +27,3 @@ services:
         value: 18
       - key: ADMIN_PASSWORD
         sync: false
-  
-  - type: web
-    name: cardio-frontend
-    env: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticpublishPath: dist
-    envVars:
-      - key: NODE_VERSION
-        value: 18
-      - key: VITE_API_BASE
-        sync: false
-        
