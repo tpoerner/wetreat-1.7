@@ -1,5 +1,5 @@
 {
-  "name": "cardio-frontend",
+  "name": "wetreat-frontend",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -14,11 +14,10 @@
     "serve": "^14.2.1"
   },
   "devDependencies": {
-  "autoprefixer": "^10.4.15",
-  "postcss": "^8.4.31",
-  "tailwindcss": "^3.4.1",
-  "@vitejs/plugin-react": "^4.3.1",
-  "vite": "^5.0.12"
-}
-
+    "@vitejs/plugin-react": "4.3.1",
+    "autoprefixer": "10.4.18",
+    "postcss": "8.4.35",
+    "tailwindcss": "3.4.10",
+    "vite": "5.4.1"
+  }
 }
