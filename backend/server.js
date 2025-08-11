@@ -22,7 +22,7 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 app.use(cors());
 app.use(express.json());
 
-// DB in /tmp for Hobby tier
+// DB in /tmp (Render Hobby)
 const dbPath = '/tmp/wetreat.sqlite';
 let db;
 
@@ -42,34 +42,42 @@ async function initDb() {
       physicianName TEXT,
       physicianEmail TEXT,
       consultationTimestamp TEXT,
+      diagnosis TEXT,          -- << NEW
       recommendations TEXT,
       createdAt TEXT
     )
   `);
+
+  // If DB existed without 'diagnosis', try to add it
+  try { await db.exec(`ALTER TABLE patients ADD COLUMN diagnosis TEXT`); } catch { /* already exists */ }
+
+  // Seed dummies if empty
   const c = await db.get('SELECT COUNT(*) as c FROM patients');
   if (c.c === 0) {
     const now = new Date().toISOString();
     await db.run(`INSERT INTO patients
-      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,diagnosis,recommendations,createdAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
         'John Doe','john.doe@example.com','1963-04-12','JD-6201',
         'Exertional chest pain, dyspnea on exertion.',
         'CAD with prior PCI (2018). HTN. Dyslipidemia. Smoker (quit 2019).',
         'Stress echo (positive) - https://example.com/stress-echo\nCoronary CTA - https://example.com/cta',
         'Increased chest discomfort last 2 weeks.',
         'Dr. Alex Rivera','alex.rivera@clinic.org', new Date().toISOString(),
+        'Stable coronary artery disease (post-PCI).',
         'Continue DAPT; optimize statin; schedule functional testing in 3 months.',
         now
       ]);
     await db.run(`INSERT INTO patients
-      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,diagnosis,recommendations,createdAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
         'Jane Smith','jane.smith@example.com','1967-09-03','JS-5812',
         'Fatigue, exertional dyspnea (NYHA II).',
         'Severe mitral regurgitation on echo (2024). T2DM.',
         'Echo report - https://example.com/echo\nCath report - https://example.com/cath',
         'No syncope. Occasional palpitations.',
         'Dr. Maria Chen','maria.chen@heartcenter.org', new Date().toISOString(),
+        'Severe primary MR; consider repair.',
         'Refer to valve team; consider repair; optimize glycemic control.',
         now
       ]);
@@ -82,20 +90,20 @@ function adminOnly(req,res,next){
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
-// Intake
+// Intake (patient/referrer)
 app.post('/api/intake', async (req,res)=>{
   try{
     const { fullName='', email='', dob='', patientId='', symptoms='', medicalHistory='', documentsList='', notes='' } = req.body || {};
     const createdAt = new Date().toISOString();
     await db.run(`INSERT INTO patients
-      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,recommendations,createdAt)
-      VALUES (?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,?)`,
+      (fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,physicianName,physicianEmail,consultationTimestamp,diagnosis,recommendations,createdAt)
+      VALUES (?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,NULL,?)`,
       [fullName,email,dob,patientId,symptoms,medicalHistory,documentsList,notes,createdAt]);
     res.json({ success:true });
   }catch(e){ console.error(e); res.status(500).json({ success:false }); }
 });
 
-// List/search/sort
+// List/search/sort (admin)
 app.get('/api/patients', adminOnly, async (req,res)=>{
   try{
     const { search='', sort='createdAt', dir='DESC' } = req.query;
@@ -103,30 +111,40 @@ app.get('/api/patients', adminOnly, async (req,res)=>{
     const safeDir = (dir||'').toUpperCase()==='ASC' ? 'ASC' : 'DESC';
     const like = `%${search}%`;
     const rows = await db.all(`SELECT * FROM patients
-      WHERE fullName LIKE ? OR email LIKE ? OR patientId LIKE ? OR symptoms LIKE ? OR medicalHistory LIKE ? OR notes LIKE ? OR documentsList LIKE ? OR physicianName LIKE ? OR physicianEmail LIKE ? OR recommendations LIKE ?
-      ORDER BY ${safeSort} ${safeDir}`, [like,like,like,like,like,like,like,like,like,like]);
+      WHERE fullName LIKE ? OR email LIKE ? OR patientId LIKE ?
+        OR symptoms LIKE ? OR medicalHistory LIKE ? OR notes LIKE ?
+        OR documentsList LIKE ? OR physicianName LIKE ? OR physicianEmail LIKE ?
+        OR diagnosis LIKE ? OR recommendations LIKE ?
+      ORDER BY ${safeSort} ${safeDir}`,
+      [like,like,like,like,like,like,like,like,like,like,like]);
     res.json(rows);
   }catch(e){ console.error(e); res.status(500).json({ success:false }); }
 });
 
-// Update consultation (auto timestamp; pull admin name/email from headers or env)
+// Update consultation (admin) — auto timestamp; can pull admin name/email from headers/env
 app.put('/api/patients/:id/consultation', adminOnly, async (req,res)=>{
   try{
     const { id } = req.params;
-    let { physicianName='', physicianEmail='', recommendations='' } = req.body || {};
+    let { physicianName='', physicianEmail='', diagnosis='', recommendations='' } = req.body || {};
     const headerName = req.headers['x-admin-name'] || ADMIN_NAME;
     const headerEmail = req.headers['x-admin-email'] || ADMIN_EMAIL;
     if (!physicianName) physicianName = headerName;
     if (!physicianEmail) physicianEmail = headerEmail;
     const consultationTimestamp = new Date().toISOString();
-    const r = await db.run(`UPDATE patients SET physicianName=?, physicianEmail=?, consultationTimestamp=?, recommendations=? WHERE id=?`,
-      [physicianName, physicianEmail, consultationTimestamp, recommendations, id]);
+
+    const r = await db.run(
+      `UPDATE patients
+       SET physicianName=?, physicianEmail=?, consultationTimestamp=?, diagnosis=?, recommendations=?
+       WHERE id=?`,
+      [physicianName, physicianEmail, consultationTimestamp, diagnosis, recommendations, id]
+    );
+
     if (r.changes===0) return res.status(404).json({ success:false, message:'Not found' });
     res.json({ success:true, consultationTimestamp });
   }catch(e){ console.error(e); res.status(500).json({ success:false }); }
 });
 
-// Delete
+// Delete (admin)
 app.delete('/api/patients/:id', adminOnly, async (req,res)=>{
   try{
     const r = await db.run('DELETE FROM patients WHERE id=?', [req.params.id]);
@@ -189,6 +207,7 @@ app.get('/api/patients/:id/report', adminOnly, async (req,res)=>{
     field('Physician Name', row.physicianName);
     field('Physician Email', row.physicianEmail);
     field('Timestamp', row.consultationTimestamp ? new Date(row.consultationTimestamp).toLocaleString() : '');
+    field('Diagnosis', row.diagnosis);                     // << NEW in PDF
     field('Recommendations', row.recommendations);
 
     doc.end();
