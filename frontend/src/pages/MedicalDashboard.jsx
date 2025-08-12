@@ -2,6 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { API } from '../apiBase';
 
 export default function MedicalDashboard() {
+ const role = localStorage.getItem('role') || '';
+if (role !== 'doctor' && role !== 'admin') {
+  return (
+    <div className="bg-white rounded-xl shadow p-6">
+      <h2 className="text-lg font-semibold mb-2">Access restricted</h2>
+      <p className="text-slate-600">Please go back and log in as <b>Medical Consultation</b> or <b>Admin Tasks</b> to access the dashboard.</p>
+    </div>
+  );
+}
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('createdAt');
