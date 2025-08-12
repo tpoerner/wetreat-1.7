@@ -1,37 +1,40 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from './components/Navbar.jsx';
 import IntakeForm from './pages/IntakeForm.jsx';
 import MedicalDashboard from './pages/MedicalDashboard.jsx';
+import Auth from './pages/Auth.jsx';
 
 export default function App() {
-  const [view, setView] = useState('intake');
-  const [admin, setAdmin] = useState(!!localStorage.getItem('admin_password'));
+  const [view, setView] = useState('auth'); // start at auth
+  const [role, setRole] = useState(localStorage.getItem('role') || '');
 
-  const onLogin = () => {
-    const pwd = prompt('Admin password:');
-    if (!pwd) return;
-    const name = prompt('Your name (for consultation header):') || '';
-    const email = prompt('Your email:') || '';
-    localStorage.setItem('admin_password', pwd);
-    if (name) localStorage.setItem('admin_name', name);
-    if (email) localStorage.setItem('admin_email', email);
-    setAdmin(true);
-    setView('dashboard');
-  };
-  const onLogout = () => {
-    localStorage.removeItem('admin_password');
-    localStorage.removeItem('admin_name');
-    localStorage.removeItem('admin_email');
-    setAdmin(false);
-    setView('intake');
+  useEffect(()=>{ setRole(localStorage.getItem('role') || ''); }, [view]);
+
+  const handleEnter = (nextView) => {
+    setRole(localStorage.getItem('role') || '');
+    setView(nextView);
   };
 
+  const logout = () => {
+    localStorage.clear();
+    setRole('');
+    setView('auth');
+  };
+
+  // Hide navbar on auth screen for a clean first impression
   return (
-    <div className="min-h-screen">
-      <Navbar onNavigate={setView} admin={admin} onLogin={onLogin} onLogout={onLogout} />
-      <div className="container py-6">
-        {view === 'intake' && <IntakeForm />}
-        {view === 'dashboard' && <MedicalDashboard />}
+    <div className="min-h-screen bg-slate-100">
+      {view !== 'auth' && (
+        <Navbar
+          role={role}
+          onNavigate={(v)=>setView(v)}
+          onLogout={logout}
+        />
+      )}
+      <div className="max-w-7xl mx-auto p-6">
+        {view === 'auth'     && <Auth onEnter={handleEnter} />}
+        {view === 'intake'   && <IntakeForm />}
+        {view === 'dashboard'&& <MedicalDashboard />}
       </div>
     </div>
   );
